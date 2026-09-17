@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>MISS THAILAND BANGKOK — THE NEW CROWN OF BANGKOK</title>
+<title>MISS THAILAND BANGKOK 2027 — THE NEW CROWN OF BANGKOK</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Trirong:wght@300;400;500;600;700&family=Sarabun:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
@@ -590,7 +590,7 @@ function renderSponsorBar(){
 }
 function renderChrome(){
   renderSponsorBar();
-  document.getElementById("brandName").innerHTML = `MISS THAILAND<br>BANGKOK<small>${bi("นางสาวไทยกรุงเทพมหานคร","The New Crown of Bangkok")}</small>`;
+  document.getElementById("brandName").innerHTML = `MISS THAILAND<br>BANGKOK 2027<small>${bi("นางสาวไทยกรุงเทพมหานคร","The New Crown of Bangkok")}</small>`;
   document.getElementById("navCta").textContent = t("applyCta");
   document.querySelectorAll("#langToggle span").forEach(s=>s.classList.toggle("on", s.dataset.lang===LANG));
   const path = location.hash || "#/";
@@ -658,7 +658,7 @@ function pageHome(){
     <div class="motif-skyline">${skylineArt()}</div>
     <div class="hero-inner">
       <p class="hero-eyebrow">MISS THAILAND BANGKOK 2027</p>
-      <h1>MISS THAILAND<br>BANGKOK</h1>
+      <h1>MISS THAILAND<br>BANGKOK 2027</h1>
       <p class="sub">THE NEW CROWN OF BANGKOK</p>
       <p class="lead">${bi("ค้นหาสตรีผู้สง่างาม ผู้พร้อมเป็นตัวแทนของกรุงเทพมหานคร","In search of the graceful woman ready to represent Bangkok to the world.")}</p>
       <div class="btn-row" style="margin-bottom:44px">
@@ -724,7 +724,7 @@ function pageHome(){
 
 function pageAbout(){
   return `<section><div class="wrap">
-    <div class="section-head"><p class="kicker">${t("about")}</p><h2>MISS THAILAND BANGKOK</h2>
+    <div class="section-head"><p class="kicker">${t("about")}</p><h2>MISS THAILAND BANGKOK 2027</h2>
       <p>${bi("เวทีประกวดนางสาวไทยกรุงเทพมหานคร ก่อตั้งขึ้นเพื่อเป็นพื้นที่ให้สตรีรุ่นใหม่ได้แสดงศักยภาพรอบด้าน — ความงาม ปัญญา บุคลิกภาพ และเป้าหมายในการสร้างคุณค่าให้สังคม","Miss Thailand Bangkok is a platform for a new generation of women to show their full potential — beauty, intellect, grace, and purpose in service of society.")}</p></div>
     <div class="grid grid-3" style="margin-bottom:54px">
       <div class="card-panel"><h3 style="margin-top:0;font-size:18px">${bi("วิสัยทัศน์","Vision")}</h3><p class="muted">${bi("ค้นหาตัวแทนหญิงสาวแห่งกรุงเทพมหานครที่เป็นแรงบันดาลใจให้สังคม","To find Bangkok's representative — a woman who inspires society.")}</p></div>
@@ -957,13 +957,13 @@ function renderFooter(){
   el.className="footer";
   el.innerHTML = `<div class="motif-skyline">${skylineArt()}</div>
   <div class="wrap">
-    <h5>MISS THAILAND BANGKOK</h5><p class="tag">${t("footerTag")}</p>
+    <h5>MISS THAILAND BANGKOK 2027</h5><p class="tag">${t("footerTag")}</p>
     <div class="footer-grid">
       <div><p class="muted" style="max-width:320px;color:rgba(248,246,242,.65)">${bi("นางสาวไทยกรุงเทพมหานคร — เวทีประกวดที่ค้นหาตัวแทนหญิงสาวผู้เปี่ยมด้วยความงามและเป้าหมาย","Miss Thailand Bangkok — a pageant in search of a woman of beauty and purpose.")}</p></div>
       <div><strong style="color:#fff;font-family:var(--font-display)">${t("quickLinks")}</strong>${["about","contestants","apply","vote","events","news","sponsors"].map(k=>`<a href="#/${k}">${t(k)}</a>`).join("")}</div>
       <div><strong style="color:#fff;font-family:var(--font-display)">${t("legal")}</strong><a href="#">${t("privacy")}</a><a href="#">${t("pdpa")}</a><a href="#">${t("terms")}</a><a href="#">${t("cookie")}</a></div>
     </div>
-    <div class="footer-bottom"><span>© 2027 MISS THAILAND BANGKOK</span><span>${t("copyright")}</span></div>
+    <div class="footer-bottom"><span>© MISS THAILAND BANGKOK 2027</span><span>${t("copyright")}</span></div>
   </div>`;
 }
 

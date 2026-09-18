@@ -579,13 +579,14 @@ function analyticsSummary(){
 const NAV_LINKS = ()=>[["#/","home"],["#/about","about"],["#/contestants","contestants"],["#/competition","competition"],["#/events","events"],["#/vote","vote"],["#/news","news"],["#/sponsors","sponsors"],["#/gallery","gallery"],["#/contact","contact"]];
 function renderSponsorBar(){
   const el = document.getElementById("sponsorBar"); if(!el) return;
-  const logoSponsors = [];
-  Object.values(SPONSORS).forEach(list => list.forEach(s => { if(typeof s==="object" && s.logo) logoSponsors.push(s); }));
-  const items = logoSponsors.map(s=>`<div class="sponsor-bar-item"><img class="${s.big?'big':''}" src="${s.logo}" alt="${sponsorName(s)}"><span class="sb-name">${sponsorName(s)}</span></div>`).join(`<div class="divider"></div>`);
+  const logosOf = tiers => { const out=[]; tiers.forEach(tier=>{ (SPONSORS[tier]||[]).forEach(s=>{ if(typeof s==="object" && s.logo) out.push(s); }); }); return out; };
+  const mainSponsors = logosOf(["TITLE PARTNER"]);
+  const coSponsors = logosOf(["PLATINUM","GOLD","SILVER"]);
+  const itemsHTML = arr => arr.map(s=>`<div class="sponsor-bar-item"><img class="${s.big?'big':''}" src="${s.logo}" alt="${sponsorName(s)}"><span class="sb-name">${sponsorName(s)}</span></div>`).join(`<div class="divider"></div>`);
   el.innerHTML = `<div class="sponsor-bar-inner">
-      <span class="sponsor-bar-label">${bi("ผู้สนับสนุนหลัก","Official Sponsors")}</span>
-      <div class="divider"></div>
-      ${items}
+      ${mainSponsors.length?`<span class="sponsor-bar-label">${bi("ผู้สนับสนุนหลัก","Main Sponsor")}</span><div class="divider"></div>${itemsHTML(mainSponsors)}`:""}
+      ${mainSponsors.length && coSponsors.length? `<div class="divider" style="height:26px;margin:0 4px"></div>`:""}
+      ${coSponsors.length?`<span class="sponsor-bar-label">${bi("ผู้ร่วมสนับสนุน","Co-Sponsors")}</span><div class="divider"></div>${itemsHTML(coSponsors)}`:""}
     </div>`;
 }
 function renderChrome(){

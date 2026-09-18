@@ -1,0 +1,7 @@
+{
+  "name": "miss-thailand-bangkok-2027",
+  "private": true,
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

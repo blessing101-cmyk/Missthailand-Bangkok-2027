@@ -1,11 +1,8 @@
 import { getStore } from "@netlify/blobs";
+import { requireRole } from "./_shared.js";
 
-function isAdminToken(token) {
-  const valid = [
-    Netlify.env.get("MTB_SUPERADMIN_PASSWORD"),
-    Netlify.env.get("MTB_ADMIN_PASSWORD")
-  ].filter(Boolean);
-  return Boolean(token) && valid.includes(token);
+async function isAdminToken(token) {
+  return Boolean(await requireRole(token, ["super", "admin"]));
 }
 
 export default async (req) => {
@@ -33,7 +30,7 @@ export default async (req) => {
 
   if (req.method === "GET") {
     const token = req.headers.get("x-admin-token") || "";
-    if (!isAdminToken(token)) {
+    if (!(await isAdminToken(token))) {
       return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), { status: 401 });
     }
     const index = (await store.get("index", { type: "json" })) || [];
@@ -49,7 +46,7 @@ export default async (req) => {
 
   if (req.method === "PATCH") {
     const token = req.headers.get("x-admin-token") || "";
-    if (!isAdminToken(token)) {
+    if (!(await isAdminToken(token))) {
       return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), { status: 401 });
     }
     let body;

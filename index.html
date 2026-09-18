@@ -317,6 +317,7 @@ th{font-weight:500;color:var(--ink-soft);font-size:11px;letter-spacing:.06em;tex
 .audit-row{font-size:12px;padding:9px 0;border-bottom:1px solid var(--line);color:var(--ink-soft);}
 ::selection{background:var(--gold);color:var(--navy);}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -549,6 +550,77 @@ async function apiDeleteUser(token, username){
     const j = await r.json().catch(()=>null);
     return Boolean(r.ok && j && j.ok);
   }catch(e){ return false; }
+}
+let REMOTE_SETTINGS = null; // {promptpayId, bahtPerVote} from the server, once reachable
+async function apiGetPublicSettings(){
+  try{
+    const r = await fetch("/api/settings");
+    const j = await r.json().catch(()=>null);
+    if(r.ok && j && j.ok){ REMOTE_SETTINGS = j.settings; return j.settings; }
+    return null;
+  }catch(e){ return null; }
+}
+async function apiSavePublicSettings(token, data){
+  try{
+    const r = await fetch("/api/settings", {method:"POST", headers:{"Content-Type":"application/json","x-admin-token":token}, body:JSON.stringify(data)});
+    const j = await r.json().catch(()=>null);
+    return Boolean(r.ok && j && j.ok);
+  }catch(e){ return false; }
+}
+async function apiCreateGiftVote(data){
+  try{
+    const r = await fetch("/api/gift-vote", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
+    const j = await r.json().catch(()=>null);
+    if(r.ok && j && j.ok) return {ok:true, id:j.id, reference:j.reference};
+    return {ok:false};
+  }catch(e){ return {ok:false, unreachable:true}; }
+}
+async function apiPatchGiftVote(token, id, action){
+  try{
+    const r = await fetch("/api/gift-vote", {method:"PATCH", headers:{"Content-Type":"application/json","x-admin-token":token}, body:JSON.stringify({id,action})});
+    const j = await r.json().catch(()=>null);
+    return Boolean(r.ok && j && j.ok);
+  }catch(e){ return false; }
+}
+async function apiGetVoteLog(token, params){
+  try{
+    const qs = new URLSearchParams(params||{}).toString();
+    const r = await fetch("/api/vote-log"+(qs?"?"+qs:""), {headers:{"x-admin-token":token}});
+    const j = await r.json().catch(()=>null);
+    if(r.ok && j && j.ok) return j.entries;
+    return null;
+  }catch(e){ return null; }
+}
+
+/* ---------------- PromptPay QR payload (Thai QR Payment / EMVCo standard, no gateway needed) ---------------- */
+function crc16ccitt(str){
+  let crc = 0xFFFF;
+  for(let c=0;c<str.length;c++){
+    crc ^= str.charCodeAt(c) << 8;
+    for(let i=0;i<8;i++){
+      crc = (crc & 0x8000) ? ((crc<<1) ^ 0x1021) : (crc<<1);
+      crc &= 0xFFFF;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4,"0");
+}
+function tlv(id,value){ return `${id}${String(value.length).padStart(2,"0")}${value}`; }
+function promptPayPayload(target, amount){
+  const digits = String(target||"").replace(/[^0-9]/g,"");
+  if(!digits) return null;
+  let idType, idValue;
+  if(digits.length===13){ idType="02"; idValue=digits; }
+  else{ idType="01"; let phone=digits; if(phone.startsWith("0")) phone="66"+phone.substring(1); idValue=phone.padStart(13,"0"); }
+  const merchantInfo = tlv("00","A000000677010111") + tlv(idType, idValue);
+  let payload = tlv("00","01") + tlv("01", amount?"12":"11") + tlv("29", merchantInfo) + tlv("53","764") + (amount ? tlv("54", Number(amount).toFixed(2)) : "") + tlv("58","TH");
+  payload += "6304";
+  return payload + crc16ccitt(payload);
+}
+function renderQrInto(elId, text){
+  const el = document.getElementById(elId); if(!el) return;
+  el.innerHTML = "";
+  if(window.QRCode){ new window.QRCode(el, {text, width:180, height:180, correctLevel:window.QRCode.CorrectLevel.M}); }
+  else { el.innerHTML = `<p class="muted" style="font-size:11px">QR library loading…</p>`; setTimeout(()=>renderQrInto(elId,text), 400); }
 }
 
 /* ---------------- votes ---------------- */
@@ -868,15 +940,67 @@ function pageVote(){
     <div class="popular-vote-tag">${icon("heart")} POPULAR VOTE</div>
     <div class="section-head left"><p class="kicker">Vote for your favorite</p><h2 style="color:#fff">${bi("ใครจะได้มงกุฎของคุณ?","WHO WILL BE YOUR CROWN?")}</h2>
       <p>${bi(`คุณมีสิทธิ์โหวตฟรี ${Math.max(0,s.dailyFree-q.used)} จาก ${s.dailyFree} ครั้งในวันนี้ คะแนนโหวตนี้เป็นคะแนนความนิยม แยกจากคะแนนกรรมการโดยสิ้นเชิง`,`You have ${Math.max(0,s.dailyFree-q.used)} of ${s.dailyFree} free votes left today. This is a popularity score — entirely separate from the judges' scores.`)}</p></div>
-    <div class="demo-flag" style="background:rgba(248,246,242,.06);border-color:var(--gold-line);color:var(--pearl)">${icon("warn")}<span>${bi("เดโม: การยืนยันตัวตนด้วย OTP และระบบซื้อโหวตต้องเชื่อมต่อ Payment Gateway จริงในเวอร์ชัน Production","Demo: OTP verification and paid votes require a real payment gateway in production.")}</span></div>
+    ${!BACKEND_ONLINE?`<div class="demo-flag" style="background:rgba(248,246,242,.06);border-color:var(--gold-line);color:var(--pearl)">${icon("warn")}<span>${bi("เดโม: ยังไม่เชื่อมต่อระบบหลังบ้าน — โหวตฟรีจะนับเฉพาะเบราว์เซอร์นี้ และโหวตแบบของขวัญจะใช้งานได้เมื่อเชื่อมต่อสำเร็จ","Demo: no live backend connected — free votes only count on this browser and gift votes need the backend to work.")}</span></div>`:""}
     <div id="voteList">${voteListHTML()}</div>
-  </div></section><footer id="siteFooter"></footer>`;
+  </div></section>
+  <section class="section-burgundy"><div class="wrap">
+    <div class="section-head left"><p class="kicker">${icon("heart")} ${bi("สนับสนุนด้วยของขวัญ","Support with a Gift")}</p><h2 style="color:#fff">${bi("โหวตแบบส่งของขวัญ","Gift Vote")}</h2>
+      <p>${bi(`ส่งเงินสนับสนุนผ่าน PromptPay ให้ผู้เข้าประกวดคนโปรด ทุกๆ ${(REMOTE_SETTINGS&&REMOTE_SETTINGS.bahtPerVote)||10} บาท เท่ากับ 1 โหวต โหวตของขวัญจะถูกนับหลังทีมงานตรวจสอบยอดโอนแล้ว`,`Send a PromptPay gift to your favorite contestant. Every ${(REMOTE_SETTINGS&&REMOTE_SETTINGS.bahtPerVote)||10} THB equals 1 vote. Gift votes are counted after the team verifies the transfer.`)}</p></div>
+    <div id="giftVoteBox">${giftVoteFormHTML()}</div>
+  </div></section>
+  <footer id="siteFooter"></footer>`;
 }
 function voteListHTML(){
   const ranked = CONTESTANTS.map((c,i)=>({c,i,votes:voteCountFor(c,i)})).sort((a,b)=>b.votes-a.votes);
   const q=getDailyQuota(), s=getSettings();
   return ranked.map(({c,votes})=>`<div class="vote-card"><div class="vote-medal ${c.mk}">${c.nickname}</div><div class="vote-info"><div class="vn">#${c.number} ${cName(c)}</div><div class="vd">${t("district")}${cDistrict(c)}</div><div class="vote-count">${votes.toLocaleString()} votes</div></div><button class="vote-btn" ${q.used>=s.dailyFree?'disabled':''} onclick="quickVote('${c.id}')">${t("voteBtn").toUpperCase()}</button></div>`).join("");
 }
+window.__gvAmount = window.__gvAmount || 0;
+function giftVoteFormHTML(){
+  const presets = [20,50,100,500];
+  const ppid = REMOTE_SETTINGS && REMOTE_SETTINGS.promptpayId;
+  if(!ppid){
+    return `<p style="color:rgba(248,246,242,.75)">${bi("ระบบโหวตของขวัญยังไม่เปิดใช้งาน (แอดมินยังไม่ได้ตั้งค่า PromptPay)","Gift voting isn't set up yet (admin hasn't configured a PromptPay ID).")}</p>`;
+  }
+  return `
+    <div class="card-panel" style="background:rgba(248,246,242,.05);border-color:rgba(248,246,242,.2);max-width:520px">
+      <div class="field"><label style="color:rgba(248,246,242,.7)">${bi("เลือกผู้เข้าประกวด","Choose a contestant")}</label>
+        <select id="gv_contestant" style="background:var(--pearl)">${CONTESTANTS.map(c=>`<option value="${c.id}">#${c.number} ${cName(c)}</option>`).join("")}</select>
+      </div>
+      <div class="field"><label style="color:rgba(248,246,242,.7)">${bi("จำนวนเงิน (บาท)","Amount (THB)")}</label>
+        <div class="btn-row" id="gv_presets" style="margin-bottom:10px">${presets.map(p=>`<button type="button" class="btn btn-outline-gold-onDark btn-sm" onclick="selectGiftAmount(${p})">฿${p}</button>`).join("")}</div>
+        <input id="gv_amount" type="number" min="1" placeholder="${bi('หรือระบุจำนวนเอง','or enter your own amount')}">
+      </div>
+      <div class="field"><label style="color:rgba(248,246,242,.7)">${bi("ข้อความถึงผู้เข้าประกวด (ไม่บังคับ)","Message to contestant (optional)")}</label><input id="gv_note"></div>
+      <button class="btn btn-onDark" onclick="startGiftVote()">${bi("สร้าง QR เพื่อโอนเงิน","Generate QR to Pay")}</button>
+    </div>
+    <div id="giftQrResult" style="margin-top:22px"></div>`;
+}
+function selectGiftAmount(v){ window.__gvAmount=v; const el=document.getElementById("gv_amount"); if(el) el.value=v; }
+window.selectGiftAmount = selectGiftAmount;
+function startGiftVote(){
+  const contestantId = document.getElementById("gv_contestant").value;
+  const amount = Number(document.getElementById("gv_amount").value || window.__gvAmount || 0);
+  const note = document.getElementById("gv_note").value;
+  if(!amount || amount<=0){ toast(bi("กรุณาระบุจำนวนเงิน","Please enter an amount.")); return; }
+  apiCreateGiftVote({contestantId, amount, deviceId:getDeviceId(), note}).then(res=>{
+    if(!res.ok){ toast(bi("สร้างคำขอไม่สำเร็จ (ต้องเชื่อมต่อระบบหลังบ้านก่อน)","Could not create the request (backend not connected).")); return; }
+    trackEvent("gift_vote_pending", res.reference);
+    const c = CONTESTANTS.find(x=>x.id===contestantId);
+    const votesEst = Math.max(1, Math.floor(amount/((REMOTE_SETTINGS&&REMOTE_SETTINGS.bahtPerVote)||10)));
+    const box = document.getElementById("giftQrResult");
+    box.innerHTML = `<div class="card-panel" style="background:#fff;max-width:320px;text-align:center">
+        <p class="muted" style="font-size:11px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em">${bi("สแกนจ่ายผ่าน PromptPay","Scan to pay via PromptPay")}</p>
+        <div id="qrHolder" style="display:flex;justify-content:center;margin-bottom:14px"></div>
+        <p style="margin:0 0 4px;font-family:var(--font-display);font-size:22px;color:var(--navy)">฿${amount.toLocaleString()}</p>
+        <p class="muted" style="font-size:12px;margin:0 0 14px">${bi("สำหรับ","For")} #${c?c.number:""} ${c?cName(c):""} · ${bi("ประมาณ","≈")} ${votesEst} ${bi("โหวต","votes")}</p>
+        <p style="font-family:var(--font-display);font-size:14px;color:var(--burgundy);margin:0 0 4px">${bi("รหัสอ้างอิง","Reference")}: ${res.reference}</p>
+        <p class="muted" style="font-size:11.5px">${bi("โอนแล้วเก็บสลิปไว้ แจ้งทีมงานพร้อมรหัสอ้างอิงนี้เพื่อยืนยัน โหวตจะถูกนับหลังตรวจสอบแล้ว","After paying, keep your slip and share this reference with the team to confirm. Votes are counted after verification.")}</p>
+      </div>`;
+    renderQrInto("qrHolder", promptPayPayload(REMOTE_SETTINGS.promptpayId, amount));
+  });
+}
+window.startGiftVote = startGiftVote;
 
 function pageNews(){
   const [feat, ...rest] = NEWS;
@@ -1026,6 +1150,7 @@ const TAB_DEFS = {
   weights:{th:"เกณฑ์การให้คะแนน",en:"Scoring Weights",roles:["super"]},
   content:{th:"จัดการเนื้อหา",en:"Content",roles:["super","admin","staff"]},
   votesettings:{th:"ตั้งค่าการโหวต",en:"Vote Settings",roles:["super","admin"]},
+  votehistory:{th:"ประวัติการโหวต",en:"Vote History",roles:["super","admin"]},
   users:{th:"ผู้ใช้งานระบบ",en:"System Users",roles:["super"]},
   audit:{th:"บันทึกการทำงาน",en:"Audit Log",roles:["super"]}
 };
@@ -1084,6 +1209,7 @@ function renderAdminTab(tab, session){
   if(tab==="weights") return adminWeights();
   if(tab==="content") return adminContent(session);
   if(tab==="votesettings") return adminVoteSettings(session);
+  if(tab==="votehistory") return adminVoteHistory(session);
   if(tab==="users") return adminUsers(session);
   if(tab==="audit") return adminAudit();
   return "";
@@ -1186,13 +1312,75 @@ function adminContent(session){
 }
 function adminVoteSettings(session){
   const s=getSettings();
+  const gv = REMOTE_SETTINGS || {promptpayId:"", bahtPerVote:10};
   return `<h3 class="serif" style="font-size:18px;margin-top:0">${bi("ตั้งค่าระบบโหวต","Vote Settings")}</h3><div class="card-panel" style="max-width:420px">
     <div class="field"><label>${bi("จำนวนโหวตฟรีต่อวัน","Free votes per day")}</label><input type="number" id="vs_free" value="${s.dailyFree}"></div>
-    <div class="field"><label>${bi("ราคาต่อโหวตเพิ่มเติม (บาท, เดโม)","Price per extra vote (THB, demo)")}</label><input type="number" id="vs_price" value="${s.pricePerVote}"></div>
-    <button class="btn btn-primary" onclick="saveVoteSettings()">${bi("บันทึก","Save")}</button></div>`;
+    <p class="muted" style="font-size:11.5px;margin-top:-10px">${bi("ค่าจริงที่บังคับใช้อยู่บนเซิร์ฟเวอร์คือ 3 ครั้ง/วัน (ปรับได้โดยแก้โค้ด vote.js)","The value actually enforced server-side is fixed at 3/day (edit vote.js to change it).")}</p>
+    <button class="btn btn-primary" onclick="saveVoteSettings()">${bi("บันทึก","Save")}</button>
+  </div>
+  <h3 class="serif" style="font-size:18px;margin-top:36px">${bi("ตั้งค่าโหวตแบบของขวัญ (PromptPay)","Gift Vote Settings (PromptPay)")}</h3>
+  <p class="muted" style="margin-top:-6px">${bi("ใส่หมายเลข PromptPay ของทีมงาน (เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก) เพื่อเปิดใช้งานหน้าโหวตของขวัญ","Enter the team's PromptPay ID (10-digit phone or 13-digit national ID) to enable the gift-vote page.")}</p>
+  <div class="card-panel" style="max-width:420px">
+    <div class="field"><label>PromptPay ID</label><input id="vs_ppid" value="${gv.promptpayId||''}" placeholder="0812345678"></div>
+    <div class="field"><label>${bi("อัตราแลกโหวต (บาทต่อ 1 โหวต)","Baht per vote")}</label><input type="number" id="vs_bpv" value="${gv.bahtPerVote||10}"></div>
+    <button class="btn btn-primary" onclick="saveGiftSettings()">${bi("บันทึก","Save")}</button>
+  </div>`;
 }
-function saveVoteSettings(){ saveSettings({dailyFree:Number(document.getElementById("vs_free").value)||3, pricePerVote:Number(document.getElementById("vs_price").value)||0}); const session=getSession(); logAudit({actor:session.u, action:bi("แก้ไขตั้งค่าการโหวต","Updated vote settings")}); toast(bi("บันทึกการตั้งค่าแล้ว","Settings saved")); router(); }
+function saveVoteSettings(){ saveSettings({dailyFree:Number(document.getElementById("vs_free").value)||3, pricePerVote:0}); const session=getSession(); logAudit({actor:session.u, action:bi("แก้ไขตั้งค่าการโหวต","Updated vote settings")}); toast(bi("บันทึกการตั้งค่าแล้ว","Settings saved")); router(); }
 window.saveVoteSettings=saveVoteSettings;
+function saveGiftSettings(){
+  const session = getSession();
+  const promptpayId = document.getElementById("vs_ppid").value;
+  const bahtPerVote = document.getElementById("vs_bpv").value;
+  apiSavePublicSettings(session.token, {promptpayId, bahtPerVote}).then(ok=>{
+    if(ok){ REMOTE_SETTINGS = {promptpayId: promptpayId.replace(/[^0-9]/g,""), bahtPerVote:Number(bahtPerVote)||10}; logAudit({actor:session.u, action:bi("แก้ไขตั้งค่าโหวตของขวัญ","Updated gift-vote settings")}); toast(bi("บันทึกแล้ว","Saved.")); router(); }
+    else toast(bi("บันทึกไม่สำเร็จ (ต้องเชื่อมต่อระบบหลังบ้านก่อน)","Could not save (backend not connected)."));
+  });
+}
+window.saveGiftSettings = saveGiftSettings;
+
+function entryTypeLabel(e){
+  if(e.type==="free") return bi("โหวตฟรี","Free vote");
+  return bi("ของขวัญ","Gift");
+}
+function entryStatusLabel(e){
+  const map = { counted: bi("นับแล้ว","Counted"), pending: bi("รอตรวจสอบ","Pending"), confirmed: bi("ยืนยันแล้ว","Confirmed"), rejected: bi("ปฏิเสธ","Rejected") };
+  return map[e.status] || e.status;
+}
+function contestantLabel(id){ const c=CONTESTANTS.find(x=>x.id===id); return c ? `#${c.number} ${cName(c)}` : id; }
+function renderVoteHistoryTable(entries){
+  if(!entries || !entries.length) return `<p class="muted">${bi("ยังไม่มีข้อมูล","No entries yet.")}</p>`;
+  return `<div class="overflow-x"><table><tr><th>${bi("เวลา","Time")}</th><th>${bi("ประเภท","Type")}</th><th>${bi("ผู้เข้าประกวด","Contestant")}</th><th>${bi("จำนวนเงิน","Amount")}</th><th>${bi("โหวต","Votes")}</th><th>${bi("สถานะ","Status")}</th><th>${bi("อ้างอิง","Ref")}</th></tr>
+    ${entries.map(e=>`<tr><td>${new Date(e.ts).toLocaleString(LANG==="th"?"th-TH":"en-GB")}</td><td>${entryTypeLabel(e)}</td><td>${contestantLabel(e.contestantId)}</td><td>${e.amount?("฿"+e.amount.toLocaleString()):"—"}</td><td>${e.votes??"—"}</td><td>${entryStatusLabel(e)}</td><td>${e.reference||"—"}</td></tr>`).join("")}
+    </table></div>`;
+}
+function adminVoteHistory(session){
+  apiGetVoteLog(session.token, {type:"gift", status:"pending"}).then(entries=>{
+    const el=document.getElementById("pendingGiftBox"); if(el) el.innerHTML = renderPendingGiftTable(entries||[]);
+  });
+  apiGetVoteLog(session.token, {limit:300}).then(entries=>{
+    const el=document.getElementById("fullHistoryBox"); if(el) el.innerHTML = renderVoteHistoryTable(entries);
+  });
+  return `<h3 class="serif" style="font-size:18px;margin-top:0">${bi("ของขวัญที่รอตรวจสอบ","Pending Gift Votes")}</h3>
+    <p class="muted" style="margin-top:-6px">${bi("ตรวจสอบยอดโอนจริงในแอปธนาคารของทีมงานก่อนกดยืนยัน","Check the real transfer in the team's banking app before confirming.")}</p>
+    <div id="pendingGiftBox">${bi("กำลังโหลด...","Loading...")}</div>
+    <h3 class="serif" style="font-size:18px;margin-top:36px">${bi("ประวัติการโหวตทั้งหมด (ตรวจสอบย้อนหลัง)","Full Vote History (Audit Log)")}</h3>
+    <div id="fullHistoryBox">${bi("กำลังโหลด...","Loading...")}</div>`;
+}
+function renderPendingGiftTable(entries){
+  if(!entries.length) return `<p class="muted">${bi("ไม่มีรายการรอตรวจสอบ","Nothing pending.")}</p>`;
+  return `<div class="overflow-x"><table><tr><th>${bi("เวลา","Time")}</th><th>${bi("ผู้เข้าประกวด","Contestant")}</th><th>${bi("จำนวนเงิน","Amount")}</th><th>${bi("อ้างอิง","Ref")}</th><th>${bi("ข้อความ","Note")}</th><th></th></tr>
+    ${entries.map(e=>`<tr><td>${new Date(e.ts).toLocaleString(LANG==="th"?"th-TH":"en-GB")}</td><td>${contestantLabel(e.contestantId)}</td><td>฿${e.amount.toLocaleString()}</td><td>${e.reference}</td><td>${e.note||"—"}</td><td style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="patchGift('${e.id}','confirm')">${bi("ยืนยัน","Confirm")}</button> <button class="btn btn-outline-gold btn-sm" onclick="patchGift('${e.id}','reject')">${bi("ปฏิเสธ","Reject")}</button></td></tr>`).join("")}
+    </table></div>`;
+}
+function patchGift(id, action){
+  const session = getSession();
+  apiPatchGiftVote(session.token, id, action).then(ok=>{
+    if(ok){ toast(action==="confirm"?bi("ยืนยันแล้ว โหวตถูกนับแล้ว","Confirmed — votes counted."):bi("ปฏิเสธรายการแล้ว","Rejected.")); logAudit({actor:session.u, action:`${action==="confirm"?bi("ยืนยัน","Confirmed"):bi("ปฏิเสธ","Rejected")} gift vote ${id}`}); router(); }
+    else toast(bi("ทำรายการไม่สำเร็จ","Could not process."));
+  });
+}
+window.patchGift = patchGift;
 const ROLE_OPTIONS = ["admin","judge","staff"];
 function renderUsersTable(users, canManage){
   return `<div class="overflow-x"><table><tr><th>Username</th><th>${bi("ชื่อ","Name")}</th><th>${bi("สิทธิ์","Role")}</th>${canManage?"<th></th>":""}</tr>
@@ -1305,6 +1493,7 @@ window.addEventListener("hashchange", router);
 document.documentElement.lang = LANG;
 router();
 apiGetVotes().then(v=>{ if(v) router(); }); // silently upgrades to real, shared vote counts when a live backend is present
+apiGetPublicSettings(); // loads PromptPay ID / baht-per-vote for the Gift Vote page, once a backend is present
 </script>
 </body>
 </html>

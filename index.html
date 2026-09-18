@@ -712,7 +712,7 @@ function pageHome(){
 
   <section class="section-burgundy"><div class="wrap center">
     <div class="motif-crown-big" style="top:-30px;left:-30px;width:220px;opacity:.08;color:#fff">${crownBig()}</div>
-    <div class="section-head"><p class="kicker">${bi("ร่วมเป็นส่วนหนึ่ง","Cast Your Vote")}</p><h2>${bi("ใครจะได้เป็นมงกุฎของคุณ?","WHO WILL BE YOUR CROWN?")}</h2><p>${bi(`ทุกเสียงของคุณมีความหมาย โหวตฟรีได้วันละ ${getSettings().dailyFree} ครั้ง`,`Every vote counts. You get ${getSettings().dailyFree} free votes per day.`)}</p></div>
+    <div class="section-head"><p class="kicker">${bi("ร่วมเป็นส่วนหนึ่ง","Cast Your Vote")}</p><h2>${bi("ใครจะได้มงกุฎของคุณ?","WHO WILL BE YOUR CROWN?")}</h2><p>${bi(`ทุกเสียงของคุณมีความหมาย โหวตฟรีได้วันละ ${getSettings().dailyFree} ครั้ง`,`Every vote counts. You get ${getSettings().dailyFree} free votes per day.`)}</p></div>
     <a href="#/vote" class="btn btn-onDark">${bi("โหวตเลย","Vote Now")}</a>
   </div></section>
 
@@ -843,7 +843,7 @@ function pageVote(){
   const s = getSettings(), q = getDailyQuota();
   return `<section class="section-navy"><div class="wrap">
     <div class="popular-vote-tag">${icon("heart")} POPULAR VOTE</div>
-    <div class="section-head left"><p class="kicker">Vote for your favorite</p><h2 style="color:#fff">${bi("ใครจะได้เป็นมงกุฎของคุณ?","WHO WILL BE YOUR CROWN?")}</h2>
+    <div class="section-head left"><p class="kicker">Vote for your favorite</p><h2 style="color:#fff">${bi("ใครจะได้มงกุฎของคุณ?","WHO WILL BE YOUR CROWN?")}</h2>
       <p>${bi(`คุณมีสิทธิ์โหวตฟรี ${Math.max(0,s.dailyFree-q.used)} จาก ${s.dailyFree} ครั้งในวันนี้ คะแนนโหวตนี้เป็นคะแนนความนิยม แยกจากคะแนนกรรมการโดยสิ้นเชิง`,`You have ${Math.max(0,s.dailyFree-q.used)} of ${s.dailyFree} free votes left today. This is a popularity score — entirely separate from the judges' scores.`)}</p></div>
     <div class="demo-flag" style="background:rgba(248,246,242,.06);border-color:var(--gold-line);color:var(--pearl)">${icon("warn")}<span>${bi("เดโม: การยืนยันตัวตนด้วย OTP และระบบซื้อโหวตต้องเชื่อมต่อ Payment Gateway จริงในเวอร์ชัน Production","Demo: OTP verification and paid votes require a real payment gateway in production.")}</span></div>
     <div id="voteList">${voteListHTML()}</div>

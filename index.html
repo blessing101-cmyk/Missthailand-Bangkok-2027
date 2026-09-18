@@ -302,6 +302,11 @@ th{font-weight:500;color:var(--ink-soft);font-size:11px;letter-spacing:.06em;tex
 .admin-logout{margin-top:20px;font-size:12px;color:rgba(248,246,242,.5);border-top:1px solid var(--line-on-dark);padding-top:14px;display:block;}
 .admin-main{flex:1;min-width:0;}
 .login-box{max-width:400px;margin:0 auto;padding:38px 32px;border:1px solid var(--beige);background:var(--pearl);}
+.pw-wrap{position:relative;}
+.pw-wrap input{padding-right:42px;width:100%;}
+.pw-toggle{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--ink-soft);padding:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.pw-toggle:hover{color:var(--burgundy);}
+.pw-toggle svg{width:18px;height:18px;}
 .demo-accounts{font-size:11.5px;color:var(--ink-soft);margin-top:18px;border-top:1px solid var(--line);padding-top:14px;}
 .demo-accounts div{display:flex;justify-content:space-between;padding:3px 0;}
 .role-tag{padding:2px 9px;font-size:10px;border:1px solid var(--gold);color:var(--navy);display:inline-block;border-radius:var(--radius-pill);}
@@ -326,7 +331,7 @@ th{font-weight:500;color:var(--ink-soft);font-size:11px;letter-spacing:.06em;tex
     <nav class="nav-desktop" id="navDesktop"></nav>
     <div class="top-actions">
       <div class="lang-toggle" id="langToggle" role="group" aria-label="Language"><span data-lang="th">TH</span><span data-lang="en">EN</span></div>
-      <a href="#/admin" class="admin-icon-btn" title="Admin" aria-label="Admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg></a>
+      <a href="#/admin" class="admin-icon-btn" title="Admin" aria-label="Admin"><svg viewBox="0 0 32 24" fill="none"><path d="M3 22 L3 10 L9 16 L16 6 L23 16 L29 10 L29 22 Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><line x1="3" y1="22" x2="29" y2="22" stroke="currentColor" stroke-width="1.6"/></svg></a>
       <a href="#/apply" class="btn btn-primary btn-sm nav-cta" id="navCta"></a>
     </div>
   </div>
@@ -370,9 +375,27 @@ const ICON = {
   pin:'<path d="M12 21s-7-6.3-7-11.5A7 7 0 0 1 19 9.5C19 14.7 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/>',
   vote:'<path d="M4 17l4-9 4 9M6 13h4"/><path d="M14 17l4-9 4 9M16 13h4"/>',
   warn:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.2"/>',
-  lotus:'<path d="M12 20c-4-1.4-6-4.6-6-8.4C6 8 8 5 12 4c4 1 6 4 6 7.6 0 3.8-2 7-6 8.4Z"/><path d="M12 20V9"/>'
+  lotus:'<path d="M12 20c-4-1.4-6-4.6-6-8.4C6 8 8 5 12 4c4 1 6 4 6 7.6 0 3.8-2 7-6 8.4Z"/><path d="M12 20V9"/>',
+  eye:'<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff:'<path d="M3 3l18 18"/><path d="M10.6 5.1A11 11 0 0 1 12 5c7 0 11 7 11 7a13.6 13.6 0 0 1-3.4 4.1M6.6 6.6C3.7 8.4 1 12 1 12s4 7 11 7a10.6 10.6 0 0 0 5.1-1.3"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'
 };
 function icon(name,cls){ return `<svg class="icon ${cls||''}" viewBox="0 0 24 24">${ICON[name]||''}</svg>`; }
+function passwordField(id, labelTxt){
+  return `<div class="field"><label>${labelTxt}</label>
+    <div class="pw-wrap">
+      <input id="${id}" type="password">
+      <button type="button" class="pw-toggle" onclick="togglePw('${id}')" aria-label="Show password">${icon('eye')}</button>
+    </div>
+  </div>`;
+}
+function togglePw(id){
+  const el = document.getElementById(id); if(!el) return;
+  const btn = el.parentElement.querySelector(".pw-toggle");
+  const show = el.type === "password";
+  el.type = show ? "text" : "password";
+  if(btn) btn.innerHTML = show ? icon("eyeOff") : icon("eye");
+}
+window.togglePw = togglePw;
 
 /* ---------------- motifs: crown / skyline / lotus / kanok ---------------- */
 function crownBig(){ return `<svg viewBox="0 0 200 160" fill="none" stroke="currentColor" stroke-width="1"><path d="M30 140 L30 70 L65 100 L100 40 L135 100 L170 70 L170 140 Z" stroke-linejoin="round"/><line x1="30" y1="140" x2="170" y2="140"/></svg>`; }
@@ -1029,7 +1052,7 @@ function pageAdminLogin(){
     <div class="section-head"><p class="kicker">${t("admin")}</p><h2>${bi("เข้าสู่ระบบหลังบ้าน","Admin Sign In")}</h2></div>
     <div class="login-box">
       <div class="field"><label>Username</label><input id="loginU"></div>
-      <div class="field"><label>Password</label><input id="loginP" type="password"></div>
+      ${passwordField("loginP", "Password")}
       <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="adminLogin()">${bi("เข้าสู่ระบบ","Sign In")}</button>
       <div class="demo-accounts"><p style="margin:0 0 8px">${bi("บัญชีทดลอง (รหัสผ่านทั้งหมด: demo123)","Demo accounts (all passwords: demo123)")}</p>${DEMO_ACCOUNTS.map(a=>`<div><span>${a.u}</span><span class="role-tag">${roleLabel(a.role)}</span></div>`).join("")}</div>
     </div>
@@ -1199,7 +1222,7 @@ function adminUsers(session){
     <div class="card-panel" style="max-width:480px">
       <div class="field"><label>Username</label><input id="nu_username"></div>
       <div class="field"><label>${bi("ชื่อที่แสดง","Display Name")}</label><input id="nu_name"></div>
-      <div class="field"><label>Password</label><input id="nu_password" type="text"></div>
+      ${passwordField("nu_password", "Password")}
       <div class="field"><label>${bi("ระดับสิทธิ์","Role")}</label>
         <select id="nu_role">
           <option value="admin">${roleLabel("admin")}</option>

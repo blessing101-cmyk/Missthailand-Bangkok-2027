@@ -1,4 +1,5 @@
 import { getStore } from "@netlify/blobs";
+import { appendVoteLog, genId } from "./_shared.js";
 
 // Base (seed) vote counts so the tallies don't start at zero.
 // These match the demo numbers already shown in the front-end.
@@ -54,6 +55,13 @@ export default async (req) => {
     tallies[contestantId] = (tallies[contestantId] || 0) + 1;
     await store.setJSON("tallies", tallies);
     await store.setJSON(quotaKey, used + 1);
+
+    await appendVoteLog({
+      id: genId("F"), type: "free", contestantId, deviceId,
+      amount: null, reference: null, note: null,
+      votes: 1, status: "counted", ts: Date.now(),
+      confirmedAt: null, confirmedBy: null
+    });
 
     return new Response(JSON.stringify({
       ok: true,

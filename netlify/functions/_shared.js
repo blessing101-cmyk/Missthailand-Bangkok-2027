@@ -31,3 +31,27 @@ export async function requireRole(token, roles) {
   const acc = await resolveToken(token);
   return acc && roles.includes(acc.role) ? acc : null;
 }
+
+// --- Unified vote history log (every free vote and every gift-vote
+// transaction gets one entry here, so it can all be audited later) ---
+export async function getVoteLog() {
+  const store = getStore("mtb-vote-log");
+  return (await store.get("entries", { type: "json" })) || [];
+}
+
+export async function saveVoteLog(log) {
+  const store = getStore("mtb-vote-log");
+  // Cap so the log can't grow without bound.
+  await store.setJSON("entries", log.slice(0, 5000));
+}
+
+export async function appendVoteLog(entry) {
+  const log = await getVoteLog();
+  log.unshift(entry);
+  await saveVoteLog(log);
+  return entry;
+}
+
+export function genId(prefix) {
+  return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}

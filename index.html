@@ -504,6 +504,29 @@ async function apiSetApplicationStatus(token, id, status){
     return Boolean(r.ok && j && j.ok);
   }catch(e){ return false; }
 }
+async function apiGetUsers(token){
+  try{
+    const r = await fetch("/api/users", {headers:{"x-admin-token":token}});
+    const j = await r.json().catch(()=>null);
+    if(r.ok && j && j.ok) return j.users;
+    return null;
+  }catch(e){ return null; }
+}
+async function apiCreateUser(token, data){
+  try{
+    const r = await fetch("/api/users", {method:"POST", headers:{"Content-Type":"application/json","x-admin-token":token}, body:JSON.stringify(data)});
+    const j = await r.json().catch(()=>null);
+    if(r.ok && j && j.ok) return {ok:true};
+    return {ok:false, error: j && j.error};
+  }catch(e){ return {ok:false, error:"network"}; }
+}
+async function apiDeleteUser(token, username){
+  try{
+    const r = await fetch("/api/users", {method:"DELETE", headers:{"Content-Type":"application/json","x-admin-token":token}, body:JSON.stringify({username})});
+    const j = await r.json().catch(()=>null);
+    return Boolean(r.ok && j && j.ok);
+  }catch(e){ return false; }
+}
 
 /* ---------------- votes ---------------- */
 function getVotes(){ return JSON.parse(localStorage.getItem("mtb_votes")||"{}"); }
@@ -1038,7 +1061,7 @@ function renderAdminTab(tab, session){
   if(tab==="weights") return adminWeights();
   if(tab==="content") return adminContent(session);
   if(tab==="votesettings") return adminVoteSettings(session);
-  if(tab==="users") return adminUsers();
+  if(tab==="users") return adminUsers(session);
   if(tab==="audit") return adminAudit();
   return "";
 }
@@ -1147,10 +1170,74 @@ function adminVoteSettings(session){
 }
 function saveVoteSettings(){ saveSettings({dailyFree:Number(document.getElementById("vs_free").value)||3, pricePerVote:Number(document.getElementById("vs_price").value)||0}); const session=getSession(); logAudit({actor:session.u, action:bi("แก้ไขตั้งค่าการโหวต","Updated vote settings")}); toast(bi("บันทึกการตั้งค่าแล้ว","Settings saved")); router(); }
 window.saveVoteSettings=saveVoteSettings;
-function adminUsers(){
-  return `<h3 class="serif" style="font-size:18px;margin-top:0">${bi("บัญชีผู้ใช้งานระบบ","System Users")}</h3><p class="muted" style="margin-top:-6px">${bi("บัญชีเดโม 4 ระดับสิทธิ์ ระบบจริงควรจัดเก็บรหัสผ่านแบบเข้ารหัสบนเซิร์ฟเวอร์","Four demo permission tiers. A real system must store hashed credentials server-side.")}</p>
-    <div class="overflow-x"><table><tr><th>Username</th><th>${bi("ชื่อ","Name")}</th><th>${bi("สิทธิ์","Role")}</th></tr>${DEMO_ACCOUNTS.map(a=>`<tr><td>${a.u}</td><td>${a.name}</td><td><span class="role-tag">${roleLabel(a.role)}</span></td></tr>`).join("")}</table></div>`;
+const ROLE_OPTIONS = ["admin","judge","staff"];
+function renderUsersTable(users, canManage){
+  return `<div class="overflow-x"><table><tr><th>Username</th><th>${bi("ชื่อ","Name")}</th><th>${bi("สิทธิ์","Role")}</th>${canManage?"<th></th>":""}</tr>
+    <tr><td>superadmin</td><td>Super Admin</td><td><span class="role-tag">${roleLabel("super")}</span></td>${canManage?"<td class=\"muted\" style=\"font-size:11px\">"+bi("บัญชีหลัก แก้ไม่ได้","fixed account")+"</td>":""}</tr>
+    ${users.map(u=>`<tr><td>${u.username}</td><td>${u.name}</td><td><span class="role-tag">${roleLabel(u.role)}</span></td>${canManage?`<td><button class="btn btn-outline-gold btn-sm" onclick="deleteUser('${u.username}')">${bi("ลบ","Remove")}</button></td>`:""}</tr>`).join("")}
+    </table></div>`;
 }
+function adminUsers(session){
+  const isSuper = session.role==="super";
+  if(!session.token){
+    // no live backend — show the old fixed demo roster, read-only
+    return `<h3 class="serif" style="font-size:18px;margin-top:0">${bi("บัญชีผู้ใช้งานระบบ","System Users")}</h3>
+      <p class="muted" style="margin-top:-6px">${bi("โหมดเดโม: ยังไม่เชื่อมต่อระบบหลังบ้าน จึงแสดงบัญชีทดลองคงที่แทนการจัดการจริง","Demo mode: no live backend connected, showing the fixed demo roster instead of real management.")}</p>
+      <div class="overflow-x"><table><tr><th>Username</th><th>${bi("ชื่อ","Name")}</th><th>${bi("สิทธิ์","Role")}</th></tr>${DEMO_ACCOUNTS.map(a=>`<tr><td>${a.u}</td><td>${a.name}</td><td><span class="role-tag">${roleLabel(a.role)}</span></td></tr>`).join("")}</table></div>`;
+  }
+  if(!isSuper){
+    return `<h3 class="serif" style="font-size:18px;margin-top:0">${bi("บัญชีผู้ใช้งานระบบ","System Users")}</h3>
+      <p class="muted">${bi("มีเฉพาะ Super Admin เท่านั้นที่เพิ่ม/ลบบัญชีผู้ดูแลได้","Only the Super Admin can add or remove admin accounts.")}</p>`;
+  }
+  apiGetUsers(session.token).then(users=>{
+    if(users){ const el=document.getElementById("usersTableBox"); if(el) el.innerHTML = renderUsersTable(users, true); }
+  });
+  return `<h3 class="serif" style="font-size:18px;margin-top:0">${bi("บัญชีผู้ใช้งานระบบ","System Users")}</h3>
+    <p class="muted" style="margin-top:-6px">${bi("คุณเป็น Super Admin เพียงคนเดียวที่เพิ่มหรือลบบัญชีผู้ดูแลระดับล่างได้","You are the sole Super Admin — the only one who can add or remove accounts below you.")}</p>
+    <div id="usersTableBox">${renderUsersTable([], true)}</div>
+    <h4 class="serif" style="font-size:15px;margin-top:30px">${bi("เพิ่มบัญชีใหม่","Add a New Account")}</h4>
+    <div class="card-panel" style="max-width:480px">
+      <div class="field"><label>Username</label><input id="nu_username"></div>
+      <div class="field"><label>${bi("ชื่อที่แสดง","Display Name")}</label><input id="nu_name"></div>
+      <div class="field"><label>Password</label><input id="nu_password" type="text"></div>
+      <div class="field"><label>${bi("ระดับสิทธิ์","Role")}</label>
+        <select id="nu_role">
+          <option value="admin">${roleLabel("admin")}</option>
+          <option value="judge">${roleLabel("judge")}</option>
+          <option value="staff">${roleLabel("staff")}</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="createUser()">${bi("เพิ่มบัญชี","Add Account")}</button>
+    </div>`;
+}
+function createUser(){
+  const session = getSession();
+  const username = document.getElementById("nu_username").value.trim();
+  const name = document.getElementById("nu_name").value.trim();
+  const password = document.getElementById("nu_password").value;
+  const role = document.getElementById("nu_role").value;
+  if(!username || !password){ toast(bi("กรุณากรอก Username และ Password","Please fill in username and password.")); return; }
+  apiCreateUser(session.token, {username, password, name, role}).then(res=>{
+    if(res.ok){
+      toast(bi("เพิ่มบัญชีแล้ว","Account added."));
+      logAudit({actor:session.u, action:`${bi("เพิ่มบัญชี","Added account")} ${username} (${role})`});
+      router();
+    } else {
+      const msg = res.error==="username_taken" ? bi("Username นี้ถูกใช้แล้ว","That username is taken.")
+        : res.error==="reserved_username" ? bi("ไม่สามารถใช้ชื่อนี้ได้","That username is reserved.")
+        : bi("เพิ่มบัญชีไม่สำเร็จ (ต้องเชื่อมต่อระบบหลังบ้านจริงก่อน)","Could not add account (requires a live backend).");
+      toast(msg);
+    }
+  });
+}
+function deleteUser(username){
+  const session = getSession();
+  apiDeleteUser(session.token, username).then(ok=>{
+    if(ok){ toast(bi("ลบบัญชีแล้ว","Account removed.")); logAudit({actor:session.u, action:`${bi("ลบบัญชี","Removed account")} ${username}`}); router(); }
+    else toast(bi("ลบไม่สำเร็จ","Could not remove account."));
+  });
+}
+window.createUser=createUser; window.deleteUser=deleteUser;
 function adminAudit(){
   const a=getAudit();
   return `<h3 class="serif" style="font-size:18px;margin-top:0">${bi("บันทึกการทำงานของระบบ","Audit Log")}</h3><p class="muted" style="margin-top:-6px">${bi("ทุกการเปลี่ยนแปลงสำคัญถูกบันทึกไว้ที่นี่","Every meaningful change is recorded here.")}</p>
